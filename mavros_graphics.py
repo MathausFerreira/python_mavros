@@ -33,14 +33,18 @@
 #
 # Revision $Id$
 
-
 import rospy
 import numpy as np
+import time
 import sys
 from std_msgs.msg import String
 from geometry_msgs.msg import PoseStamped, TwistStamped
+from sensor_msgs.msg import Image
 from mavros_msgs.msg import State
 import matplotlib.pyplot as plt
+
+from cv_bridge import CvBridge, CvBridgeError
+import cv2
 
 # Check if everything was successfully imported
 print ("Everything was successfully imported")
@@ -57,49 +61,65 @@ def Velo_Callback(data):
     velo.x.append(data.twist.linear.x)
     velo.y.append(data.twist.linear.y)
     velo.z.append(data.twist.linear.z)
-        
-def listener():
+    plot_all()
 
-    # In ROS, nodes are uniquely named. If two nodes with the same
-    # name are launched, the previous one is kicked off. The
-    # anonymous=True flag means that rospy will choose a unique
-    # name for our 'listener' node so that multiple listeners can
-    # run simultaneously.
-    rospy.init_node('python_listener', anonymous=False)
+class Img_convert:    
+    def __init__(self):
+        # rospy.init_node('image_converter', anonymous=True)
+        # self.image_pub = rospy.Publisher("image_topic_2",Image)
+        self.image_sub = rospy.Subscriber('/iris/usb_cam/image_raw', Image, self.Image_Callback)
+        self.bridge_object = CvBridge()
 
-    pose_sub = rospy.Subscriber('/mavros/local_position/pose', PoseStamped, Pose_Callback)
-    velo_sub = rospy.Subscriber('/mavros/local_position/velocity_body', TwistStamped, Velo_Callback)
-    # state_sub = rospy.Subscriber('/mavros/state', State, State_Callback)
+    def Image_Callback(self,data):
+        global cv_image
+        try:
+            cv_image = self.bridge_object.imgmsg_to_cv2(data,"bgr8")
+        except CvBridgeError as e:
+            print(e)
 
-    # spin() simply keeps python from exiting until this node is stopped
-    # rospy.spin()
+        # (rows,cols,channels) = cv_image.shape
+        # if cols > 60 and rows > 60 :
+        #     cv2.circle(cv_image, (50,50), 10, 255)
 
+        cv2.imshow("Image window", cv_image)
+        cv2.waitKey(3)
+
+        # try:
+        #     self.image_pub.publish(self.bridge.cv2_to_imgmsg(cv_image,'8UC3'))
+        # except CvBridgeError as e:
+        #     print(e)
+
+        # cv2.imshow("Camera",cv_image)
+        # time.sleep(10)
+    
 class velocity:
 
     def __init__(self):
         self.x = []
         self.y = []
         self.z = []
-    
+        
+def listener():
+    init()
 
+    # In ROS, nodes are uniquely named. If two nodes with the same
+    # name are launched, the previous one is kicked off. The
+    # anonymous=True flag means that rospy will choose a unique
+    # name for our 'listener' node so that multiple listeners can
+    # run simultaneously.
+    rospy.init_node('python_listener', anonymous=True)
 
+    pose_sub  = rospy.Subscriber('/mavros/local_position/pose', PoseStamped, Pose_Callback)
+    velo_sub  = rospy.Subscriber('/mavros/local_position/velocity_body', TwistStamped, Velo_Callback)
+    # state_sub = rospy.Subscriber('/mavros/state', State, State_Callback)
+    # spin() simply keeps python from exiting until this node is stopped
+    # rospy.spin()
+   
 def init():
     global velo, pose
 
     velo = velocity()
     pose = velocity()
-
-    # velo.x = []
-    # velo.y = []
-    # velo.z = []
-    
-    # pose.x = []
-    # pose.y = []
-    # pose.z = []
-
-    # velo = []
-    # pose = []
-    
 
     # Thread to send setpoints
     # tSetPoints = Thread(target=listener).start()
@@ -133,10 +153,22 @@ def plot_all():
     plt.show()
     plt.pause(0.5)
 
+def main():
+    ic = Img_convert()
+    listener()
+    # while True:
+    #     plot_all()
+    try:
+        rospy.spin()
+    except KeyboardInterrupt:
+        print("Shutting down")
 
+    cv2.destroyAllWindows()
 
 if __name__ == '__main__':
-    init()
-    listener()
-    while True:
-        plot_all()
+    main()
+
+    # init()
+    # while True:
+    #     print("Running")
+    #     plot_all()
