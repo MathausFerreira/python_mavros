@@ -49,33 +49,12 @@ import cv2
 # Check if everything was successfully imported
 print ("Everything was successfully imported")
 
-def Pose_Callback(data):
-    global pose 
-    pose.x.append(data.pose.position.x)
-    pose.y.append(data.pose.position.y)
-    pose.z.append(data.pose.position.z)
-    #  if len(pose.x)> 50:
-    #     pose.x.pop(0)
-    #     pose.y.pop(0)
-    #     pose.z.pop(0)
-
-def Velo_Callback(data):
-    global velo
-
-    velo.x.append(data.twist.linear.x)
-    velo.y.append(data.twist.linear.y)
-    velo.z.append(data.twist.linear.z)
-
-    # if len(velo.x)> 50:
-    #     velo.x.pop(0)
-    #     velo.y.pop(0)
-    #     velo.z.pop(0)
-
-    plot_all()
 
 class Img_convert:    
+
     def __init__(self):
         self.image_sub = rospy.Subscriber('/iris/usb_cam/image_raw', Image, self.Image_Callback)
+
         self.bridge_object = CvBridge()
 
     def Image_Callback(self,data):
@@ -87,58 +66,76 @@ class Img_convert:
         cv2.imshow("Image window", cv_image)
         cv2.waitKey(3)
 
-    
-class velocity:
+class threeDof:
     def __init__(self):
         self.x = []
         self.y = []
         self.z = []
-        
-def listener():
 
-    global velo, pose
-    velo = velocity()
-    pose = velocity()
-    # In ROS, nodes are uniquely named. If two nodes with the same
-    # name are launched, the previous one is kicked off. The
-    # anonymous=True flag means that rospy will choose a unique
-    # name for our 'listener' node so that multiple listeners can
-    # run simultaneously.
-    rospy.init_node('python_listener', anonymous=True)
+class Graphplot:
+    velo = threeDof()
+    pose = threeDof()
 
-    pose_sub  = rospy.Subscriber('/mavros/local_position/pose', PoseStamped, Pose_Callback)
-    velo_sub  = rospy.Subscriber('/mavros/local_position/velocity_body', TwistStamped, Velo_Callback)
+    def __init__(self):
+        # In ROS, nodes are uniquely named. If two nodes with the same # name are launched, the previous one is kicked off. The
+        # anonymous=True flag means that rospy will choose a unique # name for our 'listener' node so that multiple listeners can
+        # run simultaneously.
 
-def plot_all():
-    global pose, velo
+        self.node = rospy.init_node('python_listener', anonymous=True)
 
-    plt.subplot(2,1,1)
-    plt.title('Velocity')
-    plt.xlabel('Step (un)')
-    plt.ylabel('Speed(m/s)')
+        self.pose_sub  = rospy.Subscriber('/mavros/local_position/pose', PoseStamped, self.Pose_Callback)
+        self.velo_sub  = rospy.Subscriber('/mavros/local_position/velocity_body', TwistStamped, self.Velo_Callback)
 
-    plt.plot(velo.x,'r-')
-    plt.plot(velo.y,'g-')
-    plt.plot(velo.z,'b-')
-    plt.legend(['Vel x', 'Vel y', 'Vel z'])
+    def plot_all(self):
 
-    plt.subplot(2,1,2)
-    plt.title('Position')
-    plt.xlabel('Step (un)')
-    plt.ylabel('Position(m)')
+        plt.subplot(2,1,1)
+        plt.title('Velocity')
+        plt.xlabel('Step (un)')
+        plt.ylabel('Speed(m/s)')
 
-    plt.plot(pose.x,'r-')
-    plt.plot(pose.y,'g-')
-    plt.plot(pose.z,'b-')
-    plt.legend(['Pos x', 'Pos y', 'Pos z'])
+        plt.plot(self.velo.x,'r-')
+        plt.plot(self.velo.y,'g-')
+        plt.plot(self.velo.z,'b-')
+        plt.legend(['Vel x', 'Vel y', 'Vel z'])
 
-    plt.ion()
-    plt.show()
-    plt.pause(0.5)
+        plt.subplot(2,1,2)
+        plt.title('Position')
+        plt.xlabel('Step (un)')
+        plt.ylabel('Position(m)')
+
+        plt.plot(self.pose.x,'r-')
+        plt.plot(self.pose.y,'g-')
+        plt.plot(self.pose.z,'b-')
+        plt.legend(['Pos x', 'Pos y', 'Pos z'])
+
+        plt.ion()
+        plt.show()
+        plt.pause(0.5)
+
+    def Pose_Callback(self,data):
+        self.pose.x.append(data.pose.position.x)
+        self.pose.y.append(data.pose.position.y)
+        self.pose.z.append(data.pose.position.z)
+        #  if len(pose.x)> 50:
+        #     self.pose.x.pop(0)
+        #     self.pose.y.pop(0)
+        #     self.pose.z.pop(0)
+
+    def Velo_Callback(self,data):
+        self.velo.x.append(data.twist.linear.x)
+        self.velo.y.append(data.twist.linear.y)
+        self.velo.z.append(data.twist.linear.z)
+
+        # if len(velo.x)> 50:
+        #     self.velo.x.pop(0)
+        #     self.velo.y.pop(0)
+        #     self.velo.z.pop(0)
+        self.plot_all()
+
 
 def main():
 
-    listener()
+    # dataplot = Graphplot()
     ic = Img_convert()
 
     try:
