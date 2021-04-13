@@ -54,6 +54,10 @@ def Pose_Callback(data):
     pose.x.append(data.pose.position.x)
     pose.y.append(data.pose.position.y)
     pose.z.append(data.pose.position.z)
+    #  if len(pose.x)> 50:
+    #     pose.x.pop(0)
+    #     pose.y.pop(0)
+    #     pose.z.pop(0)
 
 def Velo_Callback(data):
     global velo
@@ -61,47 +65,40 @@ def Velo_Callback(data):
     velo.x.append(data.twist.linear.x)
     velo.y.append(data.twist.linear.y)
     velo.z.append(data.twist.linear.z)
+
+    # if len(velo.x)> 50:
+    #     velo.x.pop(0)
+    #     velo.y.pop(0)
+    #     velo.z.pop(0)
+
     plot_all()
 
 class Img_convert:    
     def __init__(self):
-        # rospy.init_node('image_converter', anonymous=True)
-        # self.image_pub = rospy.Publisher("image_topic_2",Image)
         self.image_sub = rospy.Subscriber('/iris/usb_cam/image_raw', Image, self.Image_Callback)
         self.bridge_object = CvBridge()
 
     def Image_Callback(self,data):
-        global cv_image
         try:
             cv_image = self.bridge_object.imgmsg_to_cv2(data,"bgr8")
         except CvBridgeError as e:
             print(e)
 
-        # (rows,cols,channels) = cv_image.shape
-        # if cols > 60 and rows > 60 :
-        #     cv2.circle(cv_image, (50,50), 10, 255)
-
         cv2.imshow("Image window", cv_image)
         cv2.waitKey(3)
 
-        # try:
-        #     self.image_pub.publish(self.bridge.cv2_to_imgmsg(cv_image,'8UC3'))
-        # except CvBridgeError as e:
-        #     print(e)
-
-        # cv2.imshow("Camera",cv_image)
-        # time.sleep(10)
     
 class velocity:
-
     def __init__(self):
         self.x = []
         self.y = []
         self.z = []
         
 def listener():
-    init()
 
+    global velo, pose
+    velo = velocity()
+    pose = velocity()
     # In ROS, nodes are uniquely named. If two nodes with the same
     # name are launched, the previous one is kicked off. The
     # anonymous=True flag means that rospy will choose a unique
@@ -111,24 +108,11 @@ def listener():
 
     pose_sub  = rospy.Subscriber('/mavros/local_position/pose', PoseStamped, Pose_Callback)
     velo_sub  = rospy.Subscriber('/mavros/local_position/velocity_body', TwistStamped, Velo_Callback)
-    # state_sub = rospy.Subscriber('/mavros/state', State, State_Callback)
-    # spin() simply keeps python from exiting until this node is stopped
-    # rospy.spin()
-   
-def init():
-    global velo, pose
-
-    velo = velocity()
-    pose = velocity()
-
-    # Thread to send setpoints
-    # tSetPoints = Thread(target=listener).start()
 
 def plot_all():
     global pose, velo
 
     plt.subplot(2,1,1)
-
     plt.title('Velocity')
     plt.xlabel('Step (un)')
     plt.ylabel('Speed(m/s)')
@@ -139,14 +123,13 @@ def plot_all():
     plt.legend(['Vel x', 'Vel y', 'Vel z'])
 
     plt.subplot(2,1,2)
-
     plt.title('Position')
     plt.xlabel('Step (un)')
-    plt.ylabel('Speed(m/s)')
+    plt.ylabel('Position(m)')
 
-    plt.plot(pose.x,'r-',label = 'Pos x')
-    plt.plot(pose.y,'g-',label = 'Pos y')
-    plt.plot(pose.z,'b-',label = 'Pos z')
+    plt.plot(pose.x,'r-')
+    plt.plot(pose.y,'g-')
+    plt.plot(pose.z,'b-')
     plt.legend(['Pos x', 'Pos y', 'Pos z'])
 
     plt.ion()
@@ -154,21 +137,16 @@ def plot_all():
     plt.pause(0.5)
 
 def main():
-    ic = Img_convert()
+
     listener()
-    # while True:
-    #     plot_all()
+    ic = Img_convert()
+
     try:
         rospy.spin()
     except KeyboardInterrupt:
         print("Shutting down")
+        # cv2.destroyAllWindows()
 
-    cv2.destroyAllWindows()
 
 if __name__ == '__main__':
     main()
-
-    # init()
-    # while True:
-    #     print("Running")
-    #     plot_all()

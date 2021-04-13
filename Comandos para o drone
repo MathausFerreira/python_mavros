@@ -1,0 +1,36 @@
+dronekit-sitl copter --home=-19.8157,-43.9542,0,180 --model=quad
+
+
+# Conecta com o linux via USB (taxa com xbee é 57600)
+sudo mavproxy.py --baudrate=57600 --master /dev/ttyS0 --out udp:127.0.0.1:14551 --out udp:192.168.56.1:14550
+sudo mavproxy.py --master /dev/ttyS0 --out udp:127.0.0.1:14551 --out udp:192.168.56.1:14550
+
+#Conecta através do SITL
+mavproxy.py --master tcp:127.0.0.1:5760 --out udp:127.0.0.1:14551 --out udp:192.168.56.1:14550
+
+
+#-----------------------------------------------------------------------------
+ORDEM dos comandos
+
+from px4-Ardupilot
+make px4_sitl_defautl jmavsim
+
+from home OR catkin/src/mavros
+roslaunch mavros px4.launch fcu_url:="udp://:14540@127.0.0.1:14557"
+
+From px4 mavros
+rosrun mission_teste.py MC_box_mission.plan
+
+##_-------------------------------------------------------------------------------------------------------
+mission with camera
+# OBS: edit file in px4-Autopilot/launch
+#<arg name="my_model_name" default="iris_fpv_cam"/>
+#<arg name="world" default="$(find mavlink_sitl_gazebo)/worlds/empty.world"/>
+#<arg name="sdf" default="$(find mavlink_sitl_gazebo)/models/$(arg my_model_name)/$(arg my_model_name).sdf"/>
+
+
+INICIAR SIMULAÇÃO
+roslaunch px4 mavros_posix_sitl.launch
+
+VISUALIZAR IMAGEM
+rosrun image_view image_view image:=/iris/usb_cam/image_raw
