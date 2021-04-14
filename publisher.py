@@ -1,6 +1,8 @@
 import rospy
+import unittest
 import mavros
 import time
+import tf
 import numpy as np
 from threading import Thread
 from geometry_msgs.msg import PoseStamped, Point, TwistStamped,Quaternion, Vector3
@@ -10,12 +12,13 @@ from std_msgs.msg import Header
 from mavros_msgs.msg import AttitudeTarget
 from mavros_msgs.msg import State, PositionTarget
 from tf.transformations import quaternion_from_euler
+from math import pi
 
 class MavrosOffboardAttCtrl:
 
     def __init__(self):
         # Node initiation
-        rospy.init_node('control_position_setpoint_py')
+        rospy.init_node('control_velocity_setpoint_py')
 
         self.att = AttitudeTarget()
 
@@ -58,16 +61,142 @@ class MavrosOffboardAttCtrl:
             except rospy.ROSInterruptException:
                 pass
 
+class MavrosOffboardPosCtrl:
+
+    def local_position_callback(self, data):
+        self.local_position = data
+
+    def __init__(self):
+        # Node initiation
+        rospy.init_node('control_position_setpoint_py')
+        self.setpoint = Point()
+        self.setpoint.x = 0
+        self.setpoint.y = 0
+        self.setpoint.z = 0
+
+        self.Pos = PoseStamped()
+
+        self.local_setpoint_pub = rospy.Publisher('/mavros/setpoint_position/local', PoseStamped, queue_size=0)
+        self.local_pos_sub = rospy.Subscriber('mavros/local_position/pose',PoseStamped,self.local_position_callback)
+        self.rate = rospy.Rate(10)
+        rospy.wait_for_service('mavros/set_mode')
+        self.set_mode_client = rospy.ServiceProxy('mavros/set_mode', SetMode)
+        rospy.wait_for_service('mavros/cmd/arming')
+        arming_client = rospy.ServiceProxy('mavros/cmd/arming', CommandBool)
+
+        # send setpoints in separate thread to better prevent failsafe
+        self.Pos_thread = Thread(target=self.sendSetpoint, args=())
+        self.Pos_thread.daemon = True
+        self.Pos_thread.start()
+
+
+        arming_client(True)
+        time.sleep(5)
+        self.set_mode_client(custom_mode="OFFBOARD")
+    
+    # Returns a radian from a degree
+    def deg2radf(self,a):
+        return float(a) * pi / 180.0
+
+    def sendSetpoint(self):
+
+        while not rospy.is_shutdown():
+            q = tf.transformations.quaternion_from_euler(0, 0, self.deg2radf(0.0), axes="sxyz")
+
+            msg = PoseStamped()
+            msg.header.stamp = rospy.Time.now()
+            msg.pose.position.x = float(self.setpoint.x)
+            msg.pose.position.y = float(self.setpoint.y)
+            msg.pose.position.z = float(self.setpoint.z)
+            msg.pose.orientation.x = q[0]
+            msg.pose.orientation.y = q[1]
+            msg.pose.orientation.z = q[2]
+            msg.pose.orientation.w = q[3]
+            self.local_setpoint_pub.publish(msg)
+            try:  # prevent garbage in console output when thread is killed
+                self.rate.sleep()
+            except rospy.ROSInterruptException:
+                pass
+
+    def is_at_position(self, x, y, z, offset):
+        """offset: meters"""
+        rospy.logdebug("current position | x:{0:.2f}, y:{1:.2f}, z:{2:.2f}".format(
+                self.local_position.pose.position.x, self.local_position.pose.
+                position.y, self.local_position.pose.position.z))
+
+        desired = np.array((x, y, z))
+        pos = np.array((self.local_position.pose.position.x,
+                        self.local_position.pose.position.y,
+                        self.local_position.pose.position.z))
+        return np.linalg.norm(desired - pos) < offset
+
+
+    def reach_position(self, x, y, z, timeout):
+        """timeout(int): seconds"""
+        # set a position setpoint
+        self.setpoint.x = x
+        self.setpoint.y = y
+        self.setpoint.z = z
+        rospy.loginfo(
+            "attempting to reach position | x: {0}, y: {1}, z: {2} | current position x: {3:.2f}, y: {4:.2f}, z: {5:.2f}".
+            format(x, y, z, self.local_position.pose.position.x,
+                   self.local_position.pose.position.y,
+                   self.local_position.pose.position.z))
+
+        # For demo purposes we will lock yaw/heading to north.
+        # yaw_degrees = 0  # North
+        # yaw = math.radians(yaw_degrees)
+        # quaternion = quaternion_from_euler(0, 0, yaw)
+        # self.pos.pose.orientation = Quaternion(*quaternion)
+
+        # does it reach the position in 'timeout' seconds?
+        loop_freq = 2  # Hz
+        rate = rospy.Rate(loop_freq)
+        reached = False
+        for i in xrange(timeout * loop_freq):
+            if self.is_at_position(self.setpoint.x,self.setpoint.y,self.setpoint.z, 1):
+                rospy.loginfo("position reached | seconds: {0} of {1}".format(
+                    i / loop_freq, timeout))
+                reached = True
+                break
+
+            try:
+                rate.sleep()
+            except rospy.ROSException as e:
+                print(e)
+
+        # self.assertTrue(reached, (
+        #     "took too long to get to position | current position x: {0:.2f}, y: {1:.2f}, z: {2:.2f} | timeout(seconds): {3}".
+        #     format(self.local_position.pose.position.x,
+        #            self.local_position.pose.position.y,
+        #            self.local_position.pose.position.z, timeout)))
+
+
 def main():
 
     # dataplot = Graphplot()
-    Ctrl = MavrosOffboardAttCtrl()
+    Ctrl = MavrosOffboardPosCtrl()
 
-    try:
-        rospy.spin()
-    except KeyboardInterrupt:
-        print("Shutting down")
-        # cv2.destroyAllWindows()
+    positions = ((1, 1, 1), (50, 50, 20), (6, -50, 2), (-50, -50, 20),(0, 0, 20))
+
+    for i in xrange(len(positions)):
+        Ctrl.reach_position(positions[i][0], positions[i][1], positions[i][2], 30)
+
+    # try:
+    #     rospy.spin()
+    # except KeyboardInterrupt:
+    #     print("Shutting down")
+    #     # cv2.destroyAllWindows()
+
+    # time.sleep(5)
+    # Ctrl.sendPosition3D(0, 0, 5)
+    # time.sleep(5)
+    # Ctrl.sendPosition3D(-10, 10, 10)
+    # time.sleep(5)
+    # Ctrl.sendPosition3D(-25, 5, 10)
+    # time.sleep(5)
+
+    Ctrl.set_mode_client(custom_mode="AUTO.RTL")
 
 
 if __name__ == '__main__':

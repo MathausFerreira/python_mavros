@@ -20,9 +20,15 @@ cd Documents
 mkdir Github
 cd Github
 
+#Terminador
+sudo add-apt-repository ppa:gnome-terminator -y
+sudo apt-get update -y
+sudo apt-get install terminator -y
+
 #google chrome
 wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
 sudo apt install ./google-chrome-stable_current_amd64.deb -y
+
 
 #Cloning PX4-Autopilot
 git clone https://github.com/PX4/PX4-Autopilot.git --recursive

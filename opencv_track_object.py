@@ -55,7 +55,6 @@ while True:
 
     cv2.imshow("Frame",frame)
     # cv2.imshow("mask",red_mask)
-    
     key = cv2.waitKey(1)
     
     if key == 27:
