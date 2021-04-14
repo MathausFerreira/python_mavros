@@ -13,6 +13,7 @@ from mavros_msgs.msg import AttitudeTarget
 from mavros_msgs.msg import State, PositionTarget
 from tf.transformations import quaternion_from_euler
 from math import pi
+from opencv_track_object import Img_process
 
 class MavrosOffboardAttCtrl:
 
@@ -84,15 +85,14 @@ class MavrosOffboardPosCtrl:
         rospy.wait_for_service('mavros/cmd/arming')
         arming_client = rospy.ServiceProxy('mavros/cmd/arming', CommandBool)
 
+        arming_client(True)
+        time.sleep(5)
+        self.set_mode_client(custom_mode="OFFBOARD")
+
         # send setpoints in separate thread to better prevent failsafe
         self.Pos_thread = Thread(target=self.sendSetpoint, args=())
         self.Pos_thread.daemon = True
         self.Pos_thread.start()
-
-
-        arming_client(True)
-        time.sleep(5)
-        self.set_mode_client(custom_mode="OFFBOARD")
     
     # Returns a radian from a degree
     def deg2radf(self,a):
@@ -165,38 +165,19 @@ class MavrosOffboardPosCtrl:
             except rospy.ROSException as e:
                 print(e)
 
-        # self.assertTrue(reached, (
-        #     "took too long to get to position | current position x: {0:.2f}, y: {1:.2f}, z: {2:.2f} | timeout(seconds): {3}".
-        #     format(self.local_position.pose.position.x,
-        #            self.local_position.pose.position.y,
-        #            self.local_position.pose.position.z, timeout)))
-
-
 def main():
 
     # dataplot = Graphplot()
     Ctrl = MavrosOffboardPosCtrl()
 
-    positions = ((1, 1, 1), (50, 50, 20), (6, -50, 2), (-50, -50, 20),(0, 0, 20))
+    CVImg = Img_process()
 
-    for i in xrange(len(positions)):
-        Ctrl.reach_position(positions[i][0], positions[i][1], positions[i][2], 30)
 
-    # try:
-    #     rospy.spin()
-    # except KeyboardInterrupt:
-    #     print("Shutting down")
-    #     # cv2.destroyAllWindows()
+    # positions = ((1, 1, 1), (50, 50, 20), (6, -50, 2), (-50, -50, 20),(0, 0, 20))
 
-    # time.sleep(5)
-    # Ctrl.sendPosition3D(0, 0, 5)
-    # time.sleep(5)
-    # Ctrl.sendPosition3D(-10, 10, 10)
-    # time.sleep(5)
-    # Ctrl.sendPosition3D(-25, 5, 10)
-    # time.sleep(5)
-
-    Ctrl.set_mode_client(custom_mode="AUTO.RTL")
+    # for i in xrange(len(positions)):
+    while True:
+        Ctrl.reach_position(CVImg.px,CVImg.py, 10, 30)
 
 
 if __name__ == '__main__':
