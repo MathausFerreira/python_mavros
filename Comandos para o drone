@@ -34,3 +34,8 @@ roslaunch px4 mavros_posix_sitl.launch
 
 VISUALIZAR IMAGEM
 rosrun image_view image_view image:=/iris/usb_cam/image_raw
+
+MUDAR ORIENTAÇÃO DA CAMERA NO IRIS FPV
+no diretório do modelo: PX4-Autopilot/Tools/sitl_gazebo/models/iris_fpv_cam
+altere o arquivo .sdf para :
+<pose>0 0 0 0 45 0</pose>

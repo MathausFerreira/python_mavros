@@ -79,7 +79,6 @@ class Img_process:
             y = 0
             w = 0
             h = 0
-
             for cnt in contours:
                 (x, y, w, h) = cv2.boundingRect(cnt)
                 # x_medium = int((x + x + w) / 2)
@@ -117,10 +116,9 @@ class Img_process:
         cap.release()
         cv2.destroyAllWindows()
 
-# if __name__ == '__main__':
-#     CVImg = Img_process()
+if __name__ == '__main__':
+    CVImg = Img_process()
 
-#     while True:
-#         CVImg.printgoal()
-#         # print("goal_x: {0} Goal_y: {1} ".format(CVImg.goal_x,CVImg.goal_y))
-
+    while True:
+        CVImg.printgoal()
+        # print("goal_x: {0} Goal_y: {1} ".format(CVImg.goal_x,CVImg.goal_y))
