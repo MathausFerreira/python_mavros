@@ -21,11 +21,11 @@ from pymavlink import mavutil
 from sensor_msgs.msg import NavSatFix, Imu
 from six.moves import xrange
 
-class MavrosCommon():
+class MavrosCommon(object):
 
-    def __init__(self, *args):
+    # def __init__(self):
         # super(MavrosCommon, self).__init__(*args)
-        self.setUp()
+        # self.setUp()
     
     def setUp(self):
         self.altitude = Altitude()
@@ -105,7 +105,7 @@ class MavrosCommon():
 
     def global_position_callback(self, data):
         self.global_position = data
-
+        
         if not self.sub_topics_ready['global_pos']:
             self.sub_topics_ready['global_pos'] = True
 
@@ -399,64 +399,11 @@ class MavrosCommon():
         #     "MAV_TYPE param get failed | timeout(seconds): {0}".format(timeout)
         # ))
 
-
-class MavrosOffboardAttCtrl:
-
-    def __init__(self):
-        # Node initiation
-        # rospy.init_node('control_velocity_setpoint_py')
-
-        self.att = AttitudeTarget()
-        self.att.body_rate = Vector3()
-
-        time.sleep(1)
-        self.att_setpoint_pub = rospy.Publisher(
-            'mavros/setpoint_raw/attitude', AttitudeTarget, queue_size=1)
-
-        rospy.wait_for_service('mavros/set_mode')
-        set_mode_client = rospy.ServiceProxy('mavros/set_mode', SetMode)
-        rospy.wait_for_service('mavros/cmd/arming')
-        arming_client = rospy.ServiceProxy('mavros/cmd/arming', CommandBool)
-
-        # send setpoints in separate thread to better prevent failsafe
-        self.att_thread = Thread(target=self.send_att, args=())
-        self.att_thread.daemon = True
-        self.att_thread.start()
-
-        self.rate = rospy.Rate(10)  # Hz
-        self.att.header = Header()
-        self.att.header.frame_id = "base_footprint"
-        self.att.body_rate.x = 0
-        self.att.body_rate.y = 0
-        self.att.body_rate.z = 0
-
-        arming_client(True)
-        time.sleep(5)
-        set_mode_client(custom_mode="OFFBOARD")
-
-    def setcommand(self, x, y, z):
-        self.att.body_rate.x = x
-        self.att.body_rate.y = y
-        self.att.body_rate.z = z
-
-    def send_att(self):
-        self.att.orientation = Quaternion(*quaternion_from_euler(0, 10, 90))
-        self.att.thrust = 0.71
-
-        self.att.type_mask = 4
-
-        while not rospy.is_shutdown():
-            self.att.header.stamp = rospy.Time.now()
-            self.att_setpoint_pub.publish(self.att)
-            try:  # prevent garbage in console output when thread is killed
-                self.rate.sleep()
-            except rospy.ROSInterruptException:
-                pass
-
-class MavrosVelCtrl():
+class MavrosVelCtrl(MavrosCommon):
 
 
     def __init__(self):
+        super(MavrosVelCtrl,self).setUp()
         # super(MavrosVelCtrl,self).setUp()
         # Node initiation
         # rospy.init_node('control_speed_setpoint')
@@ -464,21 +411,12 @@ class MavrosVelCtrl():
         self.vx = 0
         self.vy = 0
         self.vz = 0
-        self.yaw = 0
+        self.yaw = 128
 
         self.Vel = PositionTarget()
         self.Vel_setpoint_pub = rospy.Publisher('/mavros/setpoint_raw/local', PositionTarget, queue_size=10)
 
-        # self.local_pos_sub = rospy.Subscriber('/mavros/local_position/pose', PoseStamped, self.local_velo_callback)
         self.rate = rospy.Rate(20)
-        # rospy.wait_for_service('mavros/set_mode')
-        # self.set_mode_client = rospy.ServiceProxy('mavros/set_mode', SetMode)
-        # rospy.wait_for_service('mavros/cmd/arming')
-        # arming_client = rospy.ServiceProxy('mavros/cmd/arming', CommandBool)
-
-        # arming_client(True)
-        # time.sleep(5)
-        # self.set_mode_client(custom_mode="OFFBOARD")
 
         # send setpoints in separate thread to better prevent failsafe
         self.Vel_thread = Thread(target=self.sendSetpoint, args=())
@@ -487,7 +425,6 @@ class MavrosVelCtrl():
             self.Vel_thread.start()
         except:
             print("Erro ao iniciar a Thread")
-
 
     def sendSetpoint(self):
         self.Vel.header = Header()
@@ -500,7 +437,6 @@ class MavrosVelCtrl():
         PositionTarget.IGNORE_PY|
         PositionTarget.IGNORE_PZ|
         PositionTarget.IGNORE_YAW_RATE|
-        PositionTarget.IGNORE_YAW|
         PositionTarget.FORCE)
 
         while not rospy.is_shutdown():
@@ -521,7 +457,6 @@ class MavrosVelCtrl():
             except rospy.ROSInterruptException:
                 pass
 
-    
     def local_velo_callback(self, data):
         self.local_position = data
 
@@ -636,3 +571,58 @@ class MavrosOffboardPosCtrl:
             except rospy.ROSException as e:
                 print(e)
 
+class MavrosOffboardAttCtrl():
+
+
+    def __init__(self):
+
+
+        # Node initiation
+        # rospy.init_node('control_velocity_setpoint_py')
+
+        self.att = AttitudeTarget()
+        self.att.body_rate = Vector3()
+
+        time.sleep(1)
+        self.att_setpoint_pub = rospy.Publisher(
+            'mavros/setpoint_raw/attitude', AttitudeTarget, queue_size=1)
+
+        rospy.wait_for_service('mavros/set_mode')
+        set_mode_client = rospy.ServiceProxy('mavros/set_mode', SetMode)
+        rospy.wait_for_service('mavros/cmd/arming')
+        arming_client = rospy.ServiceProxy('mavros/cmd/arming', CommandBool)
+
+        # send setpoints in separate thread to better prevent failsafe
+        self.att_thread = Thread(target=self.send_att, args=())
+        self.att_thread.daemon = True
+        self.att_thread.start()
+
+        self.rate = rospy.Rate(10)  # Hz
+        self.att.header = Header()
+        self.att.header.frame_id = "base_footprint"
+        self.att.body_rate.x = 0
+        self.att.body_rate.y = 0
+        self.att.body_rate.z = 0
+
+        arming_client(True)
+        time.sleep(5)
+        set_mode_client(custom_mode="OFFBOARD")
+
+    def setcommand(self, x, y, z):
+        self.att.body_rate.x = x
+        self.att.body_rate.y = y
+        self.att.body_rate.z = z
+
+    def send_att(self):
+        self.att.orientation = Quaternion(*quaternion_from_euler(0, 10, 90))
+        self.att.thrust = 0.71
+
+        self.att.type_mask = 4
+
+        while not rospy.is_shutdown():
+            self.att.header.stamp = rospy.Time.now()
+            self.att_setpoint_pub.publish(self.att)
+            try:  # prevent garbage in console output when thread is killed
+                self.rate.sleep()
+            except rospy.ROSInterruptException:
+                pass

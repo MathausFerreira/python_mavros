@@ -13,5 +13,10 @@
         "x",
         "y",
         "z"
+    ],
+    "cSpell.ignoreWords": [
+        "global",
+        "hdg",
+        "self"
     ]
 }
