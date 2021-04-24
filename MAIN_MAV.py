@@ -131,24 +131,32 @@ if __name__ == '__main__':
     
     # Comando para sair do chao
     # Mav.set_mode("AUTO.TAKEOFF",10)
-
-    waypoint = create_waypoints() 
-
-    # waypoint = ((0, 0, 0), (50, 50, 20), (50, -50, 20), (-50, -50, 20),
-    #                  (0, 0, 20))
-
-    Mav.clear_wps(10)
-
-    Mav.send_wps(waypoint,10)
-
+    # # ======================= way point test ========================
+    # waypoint = create_waypoints() 
+    # Mav.clear_wps(10)
+    # Mav.send_wps(waypoint,10)
     # Mav.set_mode("AUTO.MISSION",10)
+    # # ================================================================
+
+  
+  
+  
+    ax=1
+    while not rospy.is_shutdown():
+        while Mav.altitude.local< 20 and ax:
+            Mav.setVel(0,0,2,0)
+            Mav.rate.sleep()
+            print(Mav.altitude.local)
+            if Mav.altitude.local>20:
+                ax=0
+        Mav.setVel(0,0,0,0)
+        Mav.setPose(100,50,5,3.14)
+        print("Posicao:  X = {0}  Y = {1} Z = {2} YAW = {3}   ".format(Mav.local_position.pose.position.x,Mav.local_position.pose.position.y,Mav.local_position.pose.position.z,Mav.local_position.pose.orientation.w))
+
+    # Mav.setPose(10,10,30,45)
 
 
-    # Modo de controle offboard
-    Mav.set_mode("OFFBOARD", 10)
-
-
-    while True:
-        Mav.rate.sleep()
-        print(Mav.extended_state)
+    # while True:
+    #     Mav.rate.sleep()
+    #     print(Mav.altitude.local)
         

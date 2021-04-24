@@ -23,10 +23,6 @@ from six.moves import xrange
 
 class MavrosCommon(object):
 
-    # def __init__(self):
-        # super(MavrosCommon, self).__init__(*args)
-        # self.setUp()
-    
     def setUp(self):
         self.altitude = Altitude()
         self.extended_state = ExtendedState()
@@ -160,8 +156,7 @@ class MavrosCommon(object):
 
         # mavros publishes a disconnected state message on init
         if not self.sub_topics_ready['state'] and data.connected:
-            self.sub_topics_ready['state'] = True
-
+            self.sub_topics_ready['state'] = True    
     
     #
     # Helper methods
@@ -181,7 +176,7 @@ class MavrosCommon(object):
                 break
             else:
                 try:
-                    res = self.set_arming_srv(arm)
+                    res = self.set_arming_srv(arm) # armando/desarmando o veiculo
                     if not res.success:
                         rospy.logerr("failed to send arm command")
                 except rospy.ServiceException as e:
@@ -211,7 +206,7 @@ class MavrosCommon(object):
                 break
             else:
                 try:
-                    res = self.set_mode_srv(0, mode)  # 0 is custom mode
+                    res = self.set_mode_srv(0, mode)  # 0 is custom mode # Setting the mode
                     if not res.mode_sent:
                         rospy.logerr("failed to send mode command")
                 except rospy.ServiceException as e:
@@ -316,7 +311,7 @@ class MavrosCommon(object):
                 break
             else:
                 try:
-                    res = self.wp_clear_srv()
+                    res = self.wp_clear_srv() # limpando nessa linha
                     if not res.success:
                         rospy.logerr("failed to send waypoint clear command")
                 except rospy.ServiceException as e:
@@ -344,7 +339,7 @@ class MavrosCommon(object):
         for i in xrange(timeout * loop_freq):
             if not wps_sent:
                 try:
-                    res = self.wp_push_srv(start_index=0, waypoints=waypoints)
+                    res = self.wp_push_srv(start_index=0, waypoints=waypoints) #enviando aqui
                     wps_sent = res.success
                     if wps_sent:
                         rospy.loginfo("waypoints successfully transferred")
@@ -404,66 +399,105 @@ class MavrosVelCtrl(MavrosCommon):
 
     def __init__(self):
         super(MavrosVelCtrl,self).setUp()
-        # super(MavrosVelCtrl,self).setUp()
         # Node initiation
         # rospy.init_node('control_speed_setpoint')
         
         self.vx = 0
         self.vy = 0
         self.vz = 0
-        self.yaw = 128
+        self.yaw_rate = 0
 
-        self.Vel = PositionTarget()
+        self.px  = 0
+        self.py  = 0
+        self.pz  = 0
+        self.yaw = 0
+
+        self.body = PositionTarget()
         self.Vel_setpoint_pub = rospy.Publisher('/mavros/setpoint_raw/local', PositionTarget, queue_size=10)
 
         self.rate = rospy.Rate(20)
 
+        self.body.header = Header()
+        self.body.header.frame_id = "body"
+        self.body.coordinate_frame = PositionTarget.FRAME_BODY_NED
+
         # send setpoints in separate thread to better prevent failsafe
-        self.Vel_thread = Thread(target=self.sendSetpoint, args=())
+        self.Vel_thread = Thread(target=self.send_body_raw, args=())
         self.Vel_thread.daemon = True
         try:
             self.Vel_thread.start()
         except:
             print("Erro ao iniciar a Thread")
 
-    def sendSetpoint(self):
-        self.Vel.header = Header()
-        self.Vel.header.frame_id = "body"
-        self.Vel.coordinate_frame = PositionTarget.FRAME_BODY_NED
-        self.Vel.type_mask = (PositionTarget.IGNORE_AFX|
+    def send_body_raw(self):
+        #Envia a velocidade em x y z e yaw
+        
+        
+    
+        while not rospy.is_shutdown():
+
+            self.body.header.stamp = rospy.Time.now()
+
+            self.body.position.x = self.px
+            self.body.position.y = self.py
+            self.body.position.z = self.pz
+            self.body.yaw = self.yaw
+
+            self.body.velocity.x = self.vx
+            self.body.velocity.y = self.vy
+            self.body.velocity.z = self.vz
+            self.body.yaw_rate = self.yaw_rate
+
+            self.Vel_setpoint_pub.publish(self.body)
+
+            try:  # prevent garbage in console output when thread is killed
+                self.rate.sleep()
+            except rospy.ROSInterruptException:
+                print("Error")
+                # pass
+
+    def setVel(self, vx,vy,vz,vyaw):
+        self.body.coordinate_frame = PositionTarget.FRAME_BODY_NED
+        self.body.type_mask = (PositionTarget.IGNORE_AFX|
         PositionTarget.IGNORE_AFY|
         PositionTarget.IGNORE_AFZ|
         PositionTarget.IGNORE_PX|
         PositionTarget.IGNORE_PY|
         PositionTarget.IGNORE_PZ|
+        PositionTarget.IGNORE_YAW|
+        PositionTarget.FORCE)
+
+        self.px  = 0
+        self.py  = 0
+        self.pz  = 0
+        self.yaw = 0
+
+        self.vx  = vx
+        self.vy  = vy
+        self.vz  = vz
+        self.yaw_rate = vyaw
+
+    def setPose(self, px,py,pz,yaw):
+        self.body.coordinate_frame = PositionTarget.FRAME_LOCAL_NED
+        self.body.type_mask =  (PositionTarget.IGNORE_AFX|
+        PositionTarget.IGNORE_AFY|
+        PositionTarget.IGNORE_AFZ|
+        PositionTarget.IGNORE_VX|
+        PositionTarget.IGNORE_VY|
+        PositionTarget.IGNORE_VZ|
         PositionTarget.IGNORE_YAW_RATE|
         PositionTarget.FORCE)
 
-        while not rospy.is_shutdown():
+        # print(self.body.type_mask)
 
-            self.Vel.header.stamp = rospy.Time.now()
+        self.vx = 0
+        self.vy = 0
+        self.vz = 0
+        self.yaw_rate = 0
 
-            self.Vel.velocity.x = self.vx
-            self.Vel.velocity.y = self.vy
-            self.Vel.velocity.z = self.vz
-            self.Vel.yaw = self.yaw
-
-            self.Vel_setpoint_pub.publish(self.Vel)
-
-            # print("IMG CLASS Vel x : {0}   Vel y: {1}   Vel z: {2}   Yaw: {3}".format(self.vx,self.vy,self.vz,self.yaw))
-
-            try:  # prevent garbage in console output when thread is killed
-                self.rate.sleep()
-            except rospy.ROSInterruptException:
-                pass
-
-    def local_velo_callback(self, data):
-        self.local_position = data
-
-    def setVel(self, vx,vy,vz,yaw):
-        self.vx = vx
-        self.vy = vy
-        self.vz = vz
+        self.px  = px
+        self.py  = py
+        self.pz  = pz
         self.yaw = yaw
 
 class MavrosOffboardPosCtrl:
